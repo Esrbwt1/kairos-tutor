@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
+import json
+from pathlib import Path
 
 # Create the FastAPI application instance
 app = FastAPI()
@@ -23,10 +25,31 @@ app.add_middleware(
 )
 # -----------------------
 
+# --- Load Curriculum Data ---
+CURRICULUM = {}
+try:
+    curriculum_path = Path(__file__).parent / "curriculum" / "rust_ownership.json"
+    with open(curriculum_path, "r") as f:
+        CURRICULUM = json.load(f)
+    print("Curriculum 'rust_ownership.json' loaded successfully.")
+except Exception as e:
+    print(f"CRITICAL ERROR: Could not load curriculum file. {e}")
+# --------------------------
+
 # Define the root endpoint
 @app.get("/")
 def read_root():
     return {"message": "Connection Established. Welcome to the Kairos Backend."}
+
+@app.get("/api/curriculum/initial")
+def get_initial_module():
+    # For now, we hard-code returning the very first module.
+    # In the future, this could track user progress.
+    try:
+        initial_module = CURRICULUM["modules"][0]
+        return {"success": True, "module": initial_module}
+    except (KeyError, IndexError) as e:
+        return {"success": False, "error": f"Failed to retrieve initial module: {e}"}
 
 class CodeRequest(BaseModel):
     code: str
@@ -49,15 +72,21 @@ async def execute_code(request: CodeRequest):
             
             output = result.get("stderr", "") or result.get("stdout", "")
 
-            # --- MOCK SOCRATIC LOGIC ---
-            # This is the first piece of our Socratic Logic Layer.
-            # If we detect the specific "moved value" error, we craft
-            # our initial Socratic question.
-            if "error[E0382]" in output and "moved value" in output:
-                socratic_message = (
-                    "An interesting error. The compiler mentions a 'moved value'. "
-                    "Before we fix it, what is your initial thought on what Rust means by 'move'?"
-                )
+            # --- DYNAMIC SOCRATIC LOGIC ---
+            # We'll check the output against the triggers for our first module
+            try:
+                module = CURRICULUM["modules"][0] # Hard-coded for now
+                triggers = module["socraticTriggers"]
+                
+                has_error_code = any(code in output for code in triggers["errorCodes"])
+                has_keyword = any(keyword in output for keyword in triggers["keywords"])
+
+                if has_error_code and has_keyword:
+                    socratic_message = triggers["initialQuestion"]
+
+            except (KeyError, IndexError):
+                # If curriculum is malformed, do nothing.
+                pass
             # -----------------------------
 
             return {"success": True, "output": output, "socratic_message": socratic_message}

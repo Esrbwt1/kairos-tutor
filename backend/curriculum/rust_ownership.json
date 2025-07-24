@@ -1,0 +1,15 @@
+{
+  "skillName": "Rust Ownership",
+  "modules": [
+    {
+      "id": "OWNERSHIP_MOVE_SEMANTICS",
+      "moduleName": "Move Semantics",
+      "initialCode": "fn main() {\n    let s1 = String::from(\"hello\");\n    let s2 = s1;\n    println!(\"{}, world!\", s1);\n}",
+      "socraticTriggers": {
+        "errorCodes": ["E0382"],
+        "keywords": ["moved value"],
+        "initialQuestion": "An interesting error. The compiler mentions a 'moved value'. Before we fix it, what is your initial thought on what Rust means by 'move'?"
+      }
+    }
+  ]
+}
