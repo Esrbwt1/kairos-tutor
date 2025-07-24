@@ -12,6 +12,18 @@
   text-align: left;
 }
 
+/*
+*  THE FIX IS HERE:
+*  This rule targets the direct children of our flex container
+*  and makes them share the available space equally.
+*/
+.app-container > * {
+  flex: 1 1 0; /* flex-grow: 1, flex-shrink: 1, flex-basis: 0 */
+  min-width: 0; /* Prevents flex items from overflowing */
+  height: 100vh;
+}
+
+
 /* Basic scrollbar styling for a consistent look */
 ::-webkit-scrollbar {
   width: 8px;
