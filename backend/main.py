@@ -31,36 +31,38 @@ def read_root():
 class CodeRequest(BaseModel):
     code: str
 
-# The new endpoint for executing code
 @app.post("/api/execute")
 async def execute_code(request: CodeRequest):
-    # The Rust Playground API endpoint
     PLAYGROUND_URL = "https://play.rust-lang.org/execute"
-
-    # The payload to send to the Playground API
     payload = {
-        "channel": "stable",
-        "mode": "debug",
-        "edition": "2021",
-        "crateType": "bin",
-        "tests": False,
-        "code": request.code,
+        "channel": "stable", "mode": "debug", "edition": "2021",
+        "crateType": "bin", "tests": False, "code": request.code,
     }
 
-    # We use an async client to make the external API call without blocking our server
+    socratic_message = None # Our new variable for the AI's message
+
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(PLAYGROUND_URL, json=payload)
-            response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+            response.raise_for_status()
             result = response.json()
             
-            # The playground returns 'stdout' on success and 'stderr' on failure/compilation error
-            # We will combine them for simplicity, prioritizing stderr if it exists.
             output = result.get("stderr", "") or result.get("stdout", "")
-            
-            return {"success": True, "output": output}
+
+            # --- MOCK SOCRATIC LOGIC ---
+            # This is the first piece of our Socratic Logic Layer.
+            # If we detect the specific "moved value" error, we craft
+            # our initial Socratic question.
+            if "error[E0382]" in output and "moved value" in output:
+                socratic_message = (
+                    "An interesting error. The compiler mentions a 'moved value'. "
+                    "Before we fix it, what is your initial thought on what Rust means by 'move'?"
+                )
+            # -----------------------------
+
+            return {"success": True, "output": output, "socratic_message": socratic_message}
 
         except httpx.RequestError as e:
-            return {"success": False, "output": f"Error contacting execution server: {e}"}
+            return {"success": False, "output": f"Error contacting execution server: {e}", "socratic_message": None}
         except Exception as e:
-            return {"success": False, "output": f"An unexpected error occurred: {e}"}
+            return {"success": False, "output": f"An unexpected error occurred: {e}", "socratic_message": None}
