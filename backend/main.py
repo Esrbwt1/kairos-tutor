@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import httpx
 import json
 from pathlib import Path
+from ai_tutor import get_socratic_response
 
 # Create the FastAPI application instance
 app = FastAPI()
@@ -62,30 +63,29 @@ async def execute_code(request: CodeRequest):
         "crateType": "bin", "tests": False, "code": request.code,
     }
 
-    socratic_message = None # Our new variable for the AI's message
+    socratic_message = None
 
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(PLAYGROUND_URL, json=payload)
             response.raise_for_status()
             result = response.json()
-            
             output = result.get("stderr", "") or result.get("stdout", "")
 
-            # --- DYNAMIC SOCRATIC LOGIC ---
-            # We'll check the output against the triggers for our first module
+            # --- REAL SOCRATIC LOGIC ---
             try:
-                module = CURRICULUM["modules"][0] # Hard-coded for now
+                module = CURRICULUM["modules"][0]
                 triggers = module["socraticTriggers"]
                 
                 has_error_code = any(code in output for code in triggers["errorCodes"])
                 has_keyword = any(keyword in output for keyword in triggers["keywords"])
 
                 if has_error_code and has_keyword:
-                    socratic_message = triggers["initialQuestion"]
+                    # If triggered, call the REAL AI to get a response
+                    guiding_question = triggers["initialQuestion"]
+                    socratic_message = await get_socratic_response(request.code, output, guiding_question)
 
             except (KeyError, IndexError):
-                # If curriculum is malformed, do nothing.
                 pass
             # -----------------------------
 
